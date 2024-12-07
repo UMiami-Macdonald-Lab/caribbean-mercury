@@ -1,5 +1,5 @@
 # R SCRIPT FOR MERCURY LEVELS IN THE CARRIBBEAN 
-# MADE BY JULIA SALTZMAN 
+# MADE BY JULIA SALTZMAN FOR CATHERINE MACDONALD
 # SET UP AND READ IN DATA  ------------------------------------------------
 
 
@@ -7,9 +7,7 @@
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-
-
-
+library(lme4)
 # MERCURY LEVELS BY COUNTRY  ----------------------------------------------
 df<- read.csv("Caribbean.csv")
 
@@ -50,6 +48,46 @@ TukeyHSD(anova_result)
 
 
 
+
+
+# MERCURY LEVELS BY GENDER  -----------------------------------------------
+
+
+# Filter out rows with missing mercury levels or gender and remove "Not Stated" gender
+df_gender <- df %>%
+  filter(!is.na(Hg..ppm.), !is.na(GENDER), GENDER != "Not stated")
+
+# Summarize mercury levels by gender
+df_summary_gender <- df_gender %>%
+  group_by(GENDER) %>%
+  summarize(mean_mercury = mean(Hg..ppm., na.rm = TRUE),
+            sd_mercury = sd(Hg..ppm., na.rm = TRUE),
+            n = n()) %>%
+  mutate(se_mercury = sd_mercury / sqrt(n))
+
+# Create the bar plot with error bars for mercury levels by gender
+ggplot(df_summary_gender, aes(x = GENDER, y = mean_mercury)) +
+  geom_bar(stat = "identity", width = 0.7, fill = "#B8D3D9") +
+  geom_errorbar(aes(ymin = mean_mercury - se_mercury, ymax = mean_mercury + se_mercury),
+                width = 0.25) +
+  labs(
+       x = "Gender",
+       y = "Mean Mercury Level (ppm)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # Increase x-axis text size
+        axis.text.y = element_text(size = 14),  # Increase y-axis text size
+        axis.title.x = element_text(size = 16),  # Increase x-axis title size
+        axis.title.y = element_text(size = 16),  # Increase y-axis title size
+        plot.title = element_text(size = 18, face = "bold"))  # Increase plot title size
+
+# Perform ANOVA to test for differences in mercury levels by gender
+anova_result <- aov(Hg..ppm. ~ GENDER, data = df_gender)
+
+# Display ANOVA table
+summary(anova_result)
+
+# If ANOVA is significant, perform post-hoc Tukey's HSD test
+TukeyHSD(anova_result)
 
 # CONDITIONS  -------------------------------------------------------------
 
@@ -251,7 +289,7 @@ print(t_test_results_df)
 # Save the results to a CSV file if needed
 write.csv(t_test_results_df, "t_test_mercury_symptoms_results.csv", row.names = FALSE)
 
-# Mercury by Total Consumption --------------------------------------------
+# MERCURY BY CONSUMPTION --------------------------------------------
 
 
 # Load necessary libraries
@@ -562,7 +600,7 @@ ranef(mixed_model_fish)
 capture.output(summary(mixed_model_fish), file = "mixed_effect_model_with_fish_summary.txt")
 
 
-# Trophic Levels  ---------------------------------------------------------
+# TROPHIC LEBELS  ---------------------------------------------------------
 
 
 # Get all fish consumption columns (they contain "month" in the name)
@@ -639,50 +677,4 @@ ggplot(data, aes(x = EDUCATION, y = Hg..ppm.)) +
   labs(title = "Boxplot of Mercury Levels by Education Level",
        x = "Education Level",
        y = "Mercury Levels (Hg [ppm])") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels if needed
-
-
-
-# Load necessary libraries
-library(tidyverse)
-library(viridis) # for color-blind friendly palette
-
-# Load the dataset
-data <- read.csv("Caribbean.csv")
-
-# Rename the columns by replacing slashes with periods
-colnames(data) <- gsub("/", ".", colnames(data))
-
-# List of seafood types columns
-seafood_columns <- grep("month", colnames(data), value = TRUE)
-
-# Convert seafood columns to numeric
-data[seafood_columns] <- lapply(data[seafood_columns], as.numeric)
-
-# Aggregate seafood consumption by country
-agg_data <- data %>%
-  group_by(COUNTRY) %>%
-  summarise(across(all_of(seafood_columns), sum, na.rm = TRUE))
-
-# Calculate percentages for each seafood type by country (of total consumption per country)
-agg_data_percent <- agg_data %>%
-  mutate(across(all_of(seafood_columns), ~ . / sum(.) * 100))
-
-# Reshape data for plotting
-agg_data_long <- agg_data_percent %>%
-  pivot_longer(cols = all_of(seafood_columns), 
-               names_to = "Seafood", 
-               values_to = "Percentage")
-
-# Plot the data using ggplot with the viridis color palette
-ggplot(agg_data_long, aes(x = COUNTRY, y = Percentage, fill = Seafood)) +
-  geom_bar(stat = "identity", position = "fill") +
-  labs(title = "Seafood Consumption Percentages by Country",
-       x = "Country", 
-       y = "Percentage of Total Consumption",
-       fill = "Seafood Type") +
-  scale_y_continuous(labels = scales::percent) +
-  scale_fill_viridis(discrete = TRUE) + # Apply viridis color palette
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme_minimal()
